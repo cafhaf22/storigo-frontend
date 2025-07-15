@@ -139,22 +139,6 @@ export const ProductTable: React.FC = () => {
     }
   };
 
-  const getStockLevelClass = (quantity: number) => {
-    const level = getStockLevel(quantity);
-    switch (level) {
-      case 'high':
-        return 'bg-success-500';
-      case 'medium':
-        return 'bg-warning-400';
-      case 'low':
-        return 'bg-warning-500';
-      case 'out':
-        return 'bg-danger-500';
-      default:
-        return 'bg-gray-400';
-    }
-  };
-
   const renderCellContent = (product: Product, field: string) => {
     const isEditing = editing.id === product.id && editing.field === field;
     
@@ -200,17 +184,25 @@ export const ProductTable: React.FC = () => {
         return (
           <div className="flex items-center">
             <span className="mr-2">{product.quantity}</span>
-            <div
-              className={`w-3 h-3 rounded-full ${getStockLevelClass(
-                product.quantity
-              )}`}
-            ></div>
           </div>
         );
       case 'category':
         return (
           <span className="px-2 py-1 text-xs rounded-full bg-gray-200 dark:bg-gray-700">
             {product.category}
+          </span>
+        );
+      case 'stock level':
+        const level = getStockLevel(product.quantity);
+        const colorMap = {
+          high: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+          medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
+          low: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
+          out: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+        };
+        return(
+          <span className={`text-xs font-semibold px-2 py-1 rounded-full ${colorMap[level]}`}>
+            {level}
           </span>
         );
       default:
@@ -250,8 +242,8 @@ export const ProductTable: React.FC = () => {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Category
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Actions
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Stock Level
               </th>
             </tr>
           </thead>
@@ -269,7 +261,7 @@ export const ProductTable: React.FC = () => {
                         <img
                           src={product.image}
                           alt={product.name}
-                          className="h-10 w-10 object-cover"
+                          className="h-12 w-12 object-cover"
                         />
                       ) : (
                         <div className="h-10 w-10 flex items-center justify-center text-gray-400">
@@ -316,10 +308,8 @@ export const ProductTable: React.FC = () => {
                 >
                   {renderCellContent(product, 'category')}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
-                    <MoreVertical size={18} />
-                  </button>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-center align-middle">
+                    {renderCellContent(product, 'stock level')}
                 </td>
               </tr>
             ))}
