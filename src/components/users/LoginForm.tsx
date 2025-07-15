@@ -45,7 +45,7 @@ export const LoginForm: React.FC = () => {
               <path d="M20 7h-9" /><path d="M14 7V3H3v18h17V7h-4" /><path d="M12 10v5" /><path d="M9 13h6" />
             </svg>
           </div>
-          <CardTitle className="text-2xl font-bold">Welcome to Inventory Pro</CardTitle>
+          <CardTitle className="text-2xl font-bold">Welcome to Storigo</CardTitle>
           <p className="text-gray-500 dark:text-gray-400 mt-2">
             Sign in to your account to continue
           </p>
