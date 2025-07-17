@@ -30,15 +30,17 @@ export const ProductTable: React.FC<ProductTableProps> = ({ products }) => {
   const editInputRef = useRef<HTMLInputElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
+  // Focus input when editing starts
   useEffect(() => {
     if (editing.id && editing.field && editInputRef.current) {
       editInputRef.current.focus();
     }
   }, [editing.id, editing.field]);
 
+  // Close context menu on outside click
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (contextMenuRef.current && !contextMenuRef.current.contains(event.target as Node)) {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
         setContextMenu(null);
       }
     };
@@ -62,6 +64,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({ products }) => {
 
   const saveEdit = () => {
     if (editing.errors.length > 0) {
+      // revert on error
       setEditing({ id: null, field: null, value: null, originalValue: null, errors: [] });
       return;
     }
@@ -85,22 +88,10 @@ export const ProductTable: React.FC<ProductTableProps> = ({ products }) => {
   };
 
   const stockLevelInfo = {
-    high: {
-      text: 'High',
-      class: 'text-blue-800 bg-blue-100 dark:text-blue-200 dark:bg-blue-800',
-    },
-    medium: {
-      text: 'Medium',
-      class: 'text-yellow-800 bg-yellow-100 dark:text-yellow-200 dark:bg-yellow-800',
-    },
-    low: {
-      text: 'Low',
-      class: 'text-orange-800 bg-orange-100 dark:text-orange-200 dark:bg-orange-800',
-    },
-    out: {
-      text: 'Out',
-      class: 'text-red-800 bg-red-100 dark:text-red-200 dark:bg-red-800',
-    },
+    high:   { text: 'High',   class: 'text-blue-800 bg-blue-100 dark:text-blue-200 dark:bg-blue-800' },
+    medium: { text: 'Medium', class: 'text-yellow-800 bg-yellow-100 dark:text-yellow-200 dark:bg-yellow-800' },
+    low:    { text: 'Low',    class: 'text-orange-800 bg-orange-100 dark:text-orange-200 dark:bg-orange-800' },
+    out:    { text: 'Out',    class: 'text-red-800 bg-red-100 dark:text-red-200 dark:bg-red-800' },
   };
 
   const renderCellContent = (product: Product, field: string) => {
@@ -144,7 +135,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({ products }) => {
       case 'stock level': {
         const level = getStockLevel(product.quantity);
         return (
-          <span className={`text-xs font-semibold px-3 py-1 rounded-full ${stockLevelInfo[level].class}`}>
+          <span className={`inline-flex items-center text-xs font-semibold px-3 py-1 rounded-full ${stockLevelInfo[level].class}`}>
             {stockLevelInfo[level].text}
           </span>
         );
@@ -154,12 +145,11 @@ export const ProductTable: React.FC<ProductTableProps> = ({ products }) => {
     }
   };
 
+  // Sort logic (stock level then name)
   const sortedProducts = [...products].sort((a, b) => {
-    const aLevel = getStockLevel(a.quantity);
-    const bLevel = getStockLevel(b.quantity);
-    const levelOrder = { out: 0, low: 1, medium: 2, high: 3 };
-    if (levelOrder[aLevel] !== levelOrder[bLevel]) return levelOrder[aLevel] - levelOrder[bLevel];
-    return a.name.localeCompare(b.name);
+    const order = { out: 0, low: 1, medium: 2, high: 3 };
+    const aL = getStockLevel(a.quantity), bL = getStockLevel(b.quantity);
+    return order[aL] !== order[bL] ? order[aL] - order[bL] : a.name.localeCompare(b.name);
   });
 
   return (
@@ -175,7 +165,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({ products }) => {
               <th className="py-3 px-3 text-center">Stock Level</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+          <tbody className="divide-y divide-gray-200 dark:divide-gray-600/40">
             {sortedProducts.map((product) => (
               <tr
                 key={product.id}
@@ -204,13 +194,13 @@ export const ProductTable: React.FC<ProductTableProps> = ({ products }) => {
                     </div>
                   </div>
                 </td>
-                <td className="py-4 px-3 cursor-pointer" onDoubleClick={() => startEditing(product.id, 'quantity', product.quantity)}>
+                <td className="py-4 px-3  text-gray-900 dark:text-white cursor-pointer" onDoubleClick={() => startEditing(product.id, 'quantity', product.quantity)}>
                   {renderCellContent(product, 'quantity')}
                 </td>
-                <td className="py-4 px-3 cursor-pointer" onDoubleClick={() => startEditing(product.id, 'price', product.price)}>
+                <td className="py-4 px-3  text-gray-900 dark:text-white cursor-pointer" onDoubleClick={() => startEditing(product.id, 'price', product.price)}>
                   {renderCellContent(product, 'price')}
                 </td>
-                <td className="py-4 px-3 cursor-pointer" onDoubleClick={() => startEditing(product.id, 'category', product.category)}>
+                <td className="py-4 px-3  text-gray-900 dark:text-white cursor-pointer" onDoubleClick={() => startEditing(product.id, 'category', product.category)}>
                   {renderCellContent(product, 'category')}
                 </td>
                 <td className="py-4 px-3 text-center">{renderCellContent(product, 'stock level')}</td>
@@ -219,6 +209,33 @@ export const ProductTable: React.FC<ProductTableProps> = ({ products }) => {
           </tbody>
         </table>
       </div>
+
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="fixed z-50 bg-white dark:bg-gray-800 shadow-lg rounded-md py-1 border border-gray-200 dark:border-gray-700"
+          style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
+        >
+          <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+            <Eye size={16} className="mr-2" />
+            View Details
+          </button>
+          <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+            <Edit size={16} className="mr-2" />
+            Edit Product
+          </button>
+          <button
+            className="flex items-center w-full px-4 py-2 text-sm text-danger-600 dark:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/30"
+            onClick={() => {
+              deleteProduct(contextMenu.id);
+              setContextMenu(null);
+            }}
+          >
+            <Trash2 size={16} className="mr-2" />
+            Delete Product
+          </button>
+        </div>
+      )}
     </Card>
   );
 };
