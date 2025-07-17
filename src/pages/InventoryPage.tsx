@@ -1,18 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Filter, List, Grid as GridIcon } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { ProductTable } from '../components/inventory/ProductTable';
 import {AddProductModal} from '../components/inventory/AddProductModal';
 import { useInventory } from '../contexts/InventoryContext';
 
+const ITEMS_PER_LOAD = 5;
+
 export const InventoryPage: React.FC = () => {
   const { products } = useInventory();
   const [view, setView] = useState<'list' | 'grid'>('list');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(ITEMS_PER_LOAD);
   const categories = Array.from(
     new Set(products.map((product) => product.category))
   );
 
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      const [entry] = entries;
+      // if the marker is visible
+      if(entry.isIntersecting){
+        setVisibleCount((prev) => prev + ITEMS_PER_LOAD);
+      }
+    });
+    const currentRef = bottomRef.current;
+    if(currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if(currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, []);
+
+  const visibleProducts = products.slice(0, visibleCount);
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -78,7 +104,8 @@ export const InventoryPage: React.FC = () => {
           </div>
         </div>
 
-        <ProductTable />
+        <ProductTable products={visibleProducts}/>
+        <div ref={bottomRef}></div>
       </div>
     </div>
   );

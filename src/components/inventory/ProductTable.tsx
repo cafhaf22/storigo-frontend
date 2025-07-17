@@ -13,8 +13,12 @@ interface EditingState {
   errors: ValidationError[];
 }
 
-export const ProductTable: React.FC = () => {
-  const { products, updateProduct, deleteProduct, validateField } = useInventory();
+interface ProductTableProps {
+  products: Product[];
+}
+
+export const ProductTable: React.FC<ProductTableProps> = ({ products }) => {
+  const { updateProduct, deleteProduct, validateField } = useInventory();
   const [editing, setEditing] = useState<EditingState>({
     id: null,
     field: null,
