@@ -4,19 +4,12 @@ import { Button } from '../components/ui/Button';
 import { ProductTable } from '../components/inventory/ProductTable';
 import {AddProductModal} from '../components/inventory/AddProductModal';
 import { useInventory } from '../contexts/InventoryContext';
-import { InventoryGridView } from "../components/inventory/InventoryGridView";
 
 const ITEMS_PER_LOAD = 5;
 
 export const InventoryPage: React.FC = () => {
   const { products } = useInventory();
-  const [view, setView] = useState<'list' | 'grid'>(() => 
-    (localStorage.getItem('inventoryViewMode') as 'list' | 'grid') || 'list');
-
-  useEffect(() => {
-    localStorage.setItem('inventoryViewMode', view);
-  }, [view]);
-
+  const [view, setView] = useState<'list' | 'grid'>('list');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_LOAD);
   const categories = Array.from(
@@ -110,7 +103,8 @@ export const InventoryPage: React.FC = () => {
             </div>
           </div>
         </div>
-        {view === 'list' ? (<ProductTable products={visibleProducts} />) : (<InventoryGridView products={visibleProducts} />)}
+
+        <ProductTable products={visibleProducts}/>
         <div ref={bottomRef}></div>
       </div>
     </div>
