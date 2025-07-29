@@ -10,17 +10,18 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.53.0",
+    "clsx": "^2.1.0",
     "lucide-react": "^0.344.0",
+    "papaparse": "^5.4.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-dropzone": "^14.2.3",
+    "react-hot-toast": "^2.4.1",
     "react-router-dom": "^6.22.3",
     "recharts": "^2.12.3",
-    "react-dropzone": "^14.2.3",
-    "clsx": "^2.1.0",
-    "react-hot-toast": "^2.4.1",
     "tailwind-merge": "^2.2.1",
-    "xlsx": "^0.18.5",
-    "papaparse": "^5.4.1"
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
@@ -37,6 +38,6 @@
     "tailwindcss": "^3.4.1",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.3.0",
-    "vite": "^5.4.2"
+    "vite": "^7.0.6"
   }
 }
