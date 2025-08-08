@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { useUser } from '../../contexts/UserContext';
 
-export const LoginForm: React.FC = () => {
+export const LoginForm: React.FC<{ onSwitchToRegister?: () => void }> = ({ onSwitchToRegister }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -142,6 +142,17 @@ export const LoginForm: React.FC = () => {
               </div>
             </div>
           </form>
+          {onSwitchToRegister && (
+          <div className="text-center mt-4">
+            <button
+              type="button"
+              onClick={onSwitchToRegister}
+              className="text-primary-600 hover:underline dark:text-primary-400"
+            >
+              Don&apos;t have an account? Register here
+            </button>
+          </div>
+        )}
         </CardContent>
       </Card>
     </div>

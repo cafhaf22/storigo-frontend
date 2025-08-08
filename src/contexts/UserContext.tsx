@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
 import { mockUsers } from '../utils/mockData';
+import { supabase } from '../lib/supabaseClient.ts'
 
 interface AuthUser {
   id: string;
@@ -31,49 +32,60 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Load initial data
   useEffect(() => {
-    setUsers(mockUsers);
-    
-    // Check for saved session
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      try {
-        const parsedUser = JSON.parse(savedUser);
-        setCurrentUser(parsedUser);
+    const checkSession = async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (data.user) {
+        const user = data.user;
+        const authUser: AuthUser = {
+          id: user.id,
+          name: user.user_metadata?.name || user.email || '',
+          email: user.email || '',
+          role: user.user_metadata?.role || 'employee',
+          avatar: user.user_metadata?.avatar_url || undefined,
+        };
+        setCurrentUser(authUser);
         setIsAuthenticated(true);
-      } catch (error) {
+        localStorage.setItem('currentUser', JSON.stringify(authUser));
+      } else {
+        setCurrentUser(null);
+        setIsAuthenticated(false);
         localStorage.removeItem('currentUser');
       }
-    }
+    };
+  
+    checkSession();
   }, []);
+  
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    // In a real app, this would call an API
-    // For demo purposes, we'll just check if the email exists and any password is accepted
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    
-    if (user) {
-      const authUser: AuthUser = {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        avatar: user.avatar
-      };
-      
-      setCurrentUser(authUser);
-      setIsAuthenticated(true);
-      localStorage.setItem('currentUser', JSON.stringify(authUser));
-      return true;
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  
+    if (error || !data.user) {
+      return false;
     }
-    
-    return false;
+  
+    const user = data.user;
+    const authUser: AuthUser = {
+      id: user.id,
+      name: user.user_metadata?.name || user.email || '',
+      email: user.email || '',
+      role: user.user_metadata?.role || 'employee',
+      avatar: user.user_metadata?.avatar_url || undefined,
+    };
+  
+    setCurrentUser(authUser);
+    setIsAuthenticated(true);
+    localStorage.setItem('currentUser', JSON.stringify(authUser));
+    return true;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut();
     setCurrentUser(null);
     setIsAuthenticated(false);
     localStorage.removeItem('currentUser');
   };
+  
 
   const addUser = (user: Omit<User, 'id' | 'createdAt'>) => {
     const newUser: User = {
