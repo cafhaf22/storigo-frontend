@@ -104,9 +104,7 @@ export const LoginForm: React.FC<{ onSwitchToRegister?: () => void }> = ({ onSwi
                     placeholder="••••••••"
                   />
                 </div>
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  For demo, any password will work
-                </p>
+
               </div>
               
               <div className="flex items-center justify-between">
