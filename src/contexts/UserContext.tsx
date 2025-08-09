@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
 import { mockUsers } from '../utils/mockData';
+import { supabase } from '../lib/supabaseClient'; // ⚠️ sin ".ts" para evitar warnings en Vite
 
 interface AuthUser {
   id: string;
@@ -8,10 +9,12 @@ interface AuthUser {
   email: string;
   role: 'admin' | 'manager' | 'employee';
   avatar?: string;
+  businessName?: string;
 }
 
 interface UserContextType {
   currentUser: AuthUser | null;
+  currentOrganizationId: string | null;
   users: User[];
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
@@ -27,74 +30,133 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [currentOrganizationId, setCurrentOrganizationId] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
 
-  // Load initial data
   useEffect(() => {
-    setUsers(mockUsers);
-    
-    // Check for saved session
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      try {
-        const parsedUser = JSON.parse(savedUser);
-        setCurrentUser(parsedUser);
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data.user) {
+        const authUser = mapAuthUser(data.user);
+        setCurrentUser(authUser);
         setIsAuthenticated(true);
-      } catch (error) {
-        localStorage.removeItem('currentUser');
+        localStorage.setItem('currentUser', JSON.stringify(authUser));
+
+        // Asegurar que el usuario tenga una organización
+        const orgId = await ensureOrganizationForUser(authUser);
+        setCurrentOrganizationId(orgId);
+        localStorage.setItem('currentOrganizationId', orgId ?? '');
+      } else {
+        clearAuthState();
       }
-    }
+    };
+    checkSession();
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    // In a real app, this would call an API
-    // For demo purposes, we'll just check if the email exists and any password is accepted
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    
-    if (user) {
-      const authUser: AuthUser = {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        avatar: user.avatar
-      };
-      
-      setCurrentUser(authUser);
-      setIsAuthenticated(true);
-      localStorage.setItem('currentUser', JSON.stringify(authUser));
-      return true;
+  const mapAuthUser = (user: any): AuthUser => ({
+    id: user.id,
+    name: user.user_metadata?.name || user.email || '',
+    email: user.email || '',
+    role: (user.user_metadata?.role as AuthUser['role']) || 'employee',
+    avatar: user.user_metadata?.avatar_url || undefined,
+    businessName: user.user_metadata?.business_name || undefined,
+  });
+
+  const ensureOrganizationForUser = async (authUser: AuthUser): Promise<string | null> => {
+    try {
+      // 1) ¿Ya tiene organización?
+      const { data: links, error: linkErr } = await supabase
+        .from('organization_users')
+        .select('organization_id')
+        .eq('user_id', authUser.id);
+
+      if (linkErr) console.warn('organization_users query error:', linkErr);
+
+      if (links && links.length > 0) {
+        return links[0].organization_id;
+      }
+
+      // 2) Crear nueva organización con el businessName (fallback al email)
+      const orgName =
+        authUser.businessName?.trim() ||
+        (authUser.name ? `${authUser.name}'s Business` : authUser.email) ||
+        'My Business';
+
+      const { data: orgRows, error: orgErr } = await supabase
+        .from('organizations')
+        .insert({ name: orgName })
+        .select('id')
+        .single();
+
+      if (orgErr || !orgRows) {
+        console.error('organizations insert error:', orgErr);
+        return null;
+      }
+
+      const newOrgId = orgRows.id as string;
+
+      // 3) Linkear usuario como owner
+      const { error: linkInsertErr } = await supabase
+        .from('organization_users')
+        .insert({ organization_id: newOrgId, user_id: authUser.id, role: 'owner' });
+
+      if (linkInsertErr) {
+        console.error('organization_users insert error:', linkInsertErr);
+        // no retornamos null, ya que la org sí existe; podríamos limpiar luego
+      }
+
+      return newOrgId;
+    } catch (e) {
+      console.error('ensureOrganizationForUser exception:', e);
+      return null;
     }
-    
-    return false;
   };
 
-  const logout = () => {
+  const login = async (email: string, password: string): Promise<boolean> => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error || !data.user) {
+      return false;
+    }
+
+    const authUser = mapAuthUser(data.user);
+    setCurrentUser(authUser);
+    setIsAuthenticated(true);
+    localStorage.setItem('currentUser', JSON.stringify(authUser));
+
+    const orgId = await ensureOrganizationForUser(authUser);
+    setCurrentOrganizationId(orgId);
+    localStorage.setItem('currentOrganizationId', orgId ?? '');
+
+    return true;
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+    clearAuthState();
+  };
+
+  const clearAuthState = () => {
     setCurrentUser(null);
     setIsAuthenticated(false);
+    setCurrentOrganizationId(null);
     localStorage.removeItem('currentUser');
+    localStorage.removeItem('currentOrganizationId');
   };
 
+  // ---- Mock users API sin tocar ----
   const addUser = (user: Omit<User, 'id' | 'createdAt'>) => {
     const newUser: User = {
       ...user,
       id: Math.random().toString(36).substring(2, 10),
       createdAt: new Date(),
     };
-    
     setUsers(prev => [...prev, newUser]);
   };
 
   const updateUser = (id: string, updates: Partial<User>) => {
-    setUsers(prev => 
-      prev.map(user => 
-        user.id === id 
-          ? { ...user, ...updates } 
-          : user
-      )
+    setUsers(prev =>
+      prev.map(user => (user.id === id ? { ...user, ...updates } : user))
     );
-
-    // If updating the current user, update the auth state as well
     if (currentUser && currentUser.id === id) {
       const updatedUser = { ...currentUser, ...updates };
       setCurrentUser(updatedUser);
@@ -104,29 +166,26 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deleteUser = (id: string) => {
     setUsers(prev => prev.filter(user => user.id !== id));
-    
-    // If deleting the current user, log them out
     if (currentUser && currentUser.id === id) {
       logout();
     }
   };
 
-  const getUser = (id: string): User | undefined => {
-    return users.find(user => user.id === id);
-  };
+  const getUser = (id: string): User | undefined => users.find(u => u.id === id);
 
   return (
-    <UserContext.Provider 
-      value={{ 
-        currentUser, 
-        users, 
-        login, 
-        logout, 
+    <UserContext.Provider
+      value={{
+        currentUser,
+        currentOrganizationId,
+        users,
+        login,
+        logout,
         isAuthenticated,
         addUser,
         updateUser,
         deleteUser,
-        getUser
+        getUser,
       }}
     >
       {children}
