@@ -15,9 +15,10 @@ interface EditingState {
 
 interface ProductTableProps {
   products: Product[];
+  highlightedId?: string;
 }
 
-export const ProductTable: React.FC<ProductTableProps> = ({ products }) => {
+export const ProductTable: React.FC<ProductTableProps> = ({ products, highlightedId }) => {
   const { updateProduct, deleteProduct, validateField } = useInventory();
   const [editing, setEditing] = useState<EditingState>({
     id: null,
@@ -29,6 +30,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({ products }) => {
   const [contextMenu, setContextMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
+  const firstRowRef = useRef<HTMLTableRowElement>(null);
 
   // Focus input when editing starts
   useEffect(() => {
@@ -48,6 +50,13 @@ export const ProductTable: React.FC<ProductTableProps> = ({ products }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Scroll al destacado si existe
+  useEffect(() => {
+    if (highlightedId && firstRowRef.current) {
+      firstRowRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }, [highlightedId]);
+
   const handleContextMenu = (e: React.MouseEvent<HTMLTableRowElement>, product: Product) => {
     e.preventDefault();
     setContextMenu({ id: product.id, x: e.clientX, y: e.clientY });
@@ -64,7 +73,6 @@ export const ProductTable: React.FC<ProductTableProps> = ({ products }) => {
 
   const saveEdit = () => {
     if (editing.errors.length > 0) {
-      // revert on error
       setEditing({ id: null, field: null, value: null, originalValue: null, errors: [] });
       return;
     }
@@ -145,12 +153,24 @@ export const ProductTable: React.FC<ProductTableProps> = ({ products }) => {
     }
   };
 
-  // Sort logic (stock level then name)
-  const sortedProducts = [...products].sort((a, b) => {
-    const order = { out: 0, low: 1, medium: 2, high: 3 };
+  // Orden:
+  // 1) Si hay highlighted, va primero
+  // 2) El resto, con tu sort actual (stock level -> name)
+  const order = { out: 0, low: 1, medium: 2, high: 3 };
+  const others = highlightedId
+    ? products.filter(p => String(p.id) !== String(highlightedId))
+    : products;
+
+  const sortedOthers = [...others].sort((a, b) => {
     const aL = getStockLevel(a.quantity), bL = getStockLevel(b.quantity);
     return order[aL] !== order[bL] ? order[aL] - order[bL] : a.name.localeCompare(b.name);
   });
+
+  const highlighted = highlightedId
+    ? products.find(p => String(p.id) === String(highlightedId))
+    : null;
+
+  const finalRows = highlighted ? [highlighted, ...sortedOthers] : sortedOthers;
 
   return (
     <Card className="w-full p-4">
@@ -166,46 +186,50 @@ export const ProductTable: React.FC<ProductTableProps> = ({ products }) => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-gray-600/40">
-            {sortedProducts.map((product) => (
-              <tr
-                key={product.id}
-                className="hover:bg-gray-50 dark:hover:bg-gray-800"
-                onContextMenu={(e) => handleContextMenu(e, product)}
-              >
-                <td className="py-4 px-3">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded overflow-hidden bg-gray-100 dark:bg-gray-800">
-                      {product.image ? (
-                        <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400">
-                          <Eye size={16} />
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <div
-                        className="font-medium text-gray-900 dark:text-white cursor-pointer"
-                        onDoubleClick={() => startEditing(product.id, 'name', product.name)}
-                      >
-                        {renderCellContent(product, 'name')}
+            {finalRows.map((product, idx) => {
+              const isFirstHighlighted = highlighted && idx === 0 && String(product.id) === String(highlightedId);
+              return (
+                <tr
+                  key={product.id}
+                  ref={isFirstHighlighted ? firstRowRef : undefined}
+                  className={`hover:bg-gray-50 dark:hover:bg-gray-800 ${isFirstHighlighted ? 'ring-2 ring-primary-500/60 rounded-lg' : ''}`}
+                  onContextMenu={(e) => handleContextMenu(e, product)}
+                >
+                  <td className="py-4 px-3">
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 rounded overflow-hidden bg-gray-100 dark:bg-gray-800">
+                        {product.image ? (
+                          <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-400">
+                            <Eye size={16} />
+                          </div>
+                        )}
                       </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">ID: {product.id.slice(0, 8)}</div>
+                      <div>
+                        <div
+                          className="font-medium text-gray-900 dark:text-white cursor-pointer"
+                          onDoubleClick={() => startEditing(product.id, 'name', product.name)}
+                        >
+                          {renderCellContent(product, 'name')}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">ID: {product.id.slice(0, 8)}</div>
+                      </div>
                     </div>
-                  </div>
-                </td>
-                <td className="py-4 px-3  text-gray-900 dark:text-white cursor-pointer" onDoubleClick={() => startEditing(product.id, 'quantity', product.quantity)}>
-                  {renderCellContent(product, 'quantity')}
-                </td>
-                <td className="py-4 px-3  text-gray-900 dark:text-white cursor-pointer" onDoubleClick={() => startEditing(product.id, 'price', product.price)}>
-                  {renderCellContent(product, 'price')}
-                </td>
-                <td className="py-4 px-3  text-gray-900 dark:text-white cursor-pointer" onDoubleClick={() => startEditing(product.id, 'category', product.category)}>
-                  {renderCellContent(product, 'category')}
-                </td>
-                <td className="py-4 px-3 text-center">{renderCellContent(product, 'stock level')}</td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="py-4 px-3  text-gray-900 dark:text-white cursor-pointer" onDoubleClick={() => startEditing(product.id, 'quantity', product.quantity)}>
+                    {renderCellContent(product, 'quantity')}
+                  </td>
+                  <td className="py-4 px-3  text-gray-900 dark:text-white cursor-pointer" onDoubleClick={() => startEditing(product.id, 'price', product.price)}>
+                    {renderCellContent(product, 'price')}
+                  </td>
+                  <td className="py-4 px-3  text-gray-900 dark:text-white cursor-pointer" onDoubleClick={() => startEditing(product.id, 'category', product.category)}>
+                    {renderCellContent(product, 'category')}
+                  </td>
+                  <td className="py-4 px-3 text-center">{renderCellContent(product, 'stock level')}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
