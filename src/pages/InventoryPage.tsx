@@ -1,17 +1,22 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Plus, Filter, List, Grid as GridIcon } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { ProductTable } from '../components/inventory/ProductTable';
-import {AddProductModal} from '../components/inventory/AddProductModal';
+import { AddProductModal } from '../components/inventory/AddProductModal';
 import { useInventory } from '../contexts/InventoryContext';
 import { InventoryGridView } from "../components/inventory/InventoryGridView";
+import { useSearchParams } from 'react-router-dom';
+
 
 const ITEMS_PER_LOAD = 5;
 
 export const InventoryPage: React.FC = () => {
   const { products } = useInventory();
-  const [view, setView] = useState<'list' | 'grid'>(() => 
-    (localStorage.getItem('inventoryViewMode') as 'list' | 'grid') || 'list');
+  const [params] = useSearchParams();
+  const highlightedId = params.get('highlight') ?? undefined;
+  const [view, setView] = useState<'list' | 'grid'>(() =>
+    (localStorage.getItem('inventoryViewMode') as 'list' | 'grid') || 'list'
+  );
 
   useEffect(() => {
     localStorage.setItem('inventoryViewMode', view);
@@ -19,33 +24,33 @@ export const InventoryPage: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_LOAD);
-  const categories = Array.from(
-    new Set(products.map((product) => product.category))
-  );
+  const categories = Array.from(new Set(products.map((product) => product.category)));
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
       const [entry] = entries;
-      // if the marker is visible
-      if(entry.isIntersecting){
+      if (entry.isIntersecting) {
         setVisibleCount((prev) => prev + ITEMS_PER_LOAD);
       }
     });
     const currentRef = bottomRef.current;
-    if(currentRef) {
-      observer.observe(currentRef);
-    }
-
-    return () => {
-      if(currentRef) {
-        observer.unobserve(currentRef);
-      }
-    };
+    if (currentRef) observer.observe(currentRef);
+    return () => { if (currentRef) observer.unobserve(currentRef); };
   }, []);
 
-  const visibleProducts = products.slice(0, visibleCount);
+  // Reordenamos para poner el highlighted al inicio (si existe)
+  const reordered = React.useMemo(() => {
+    if (!highlightedId) return products;
+    const idx = products.findIndex(p => String(p.id) === String(highlightedId));
+    if (idx < 0) return products;
+    const highlighted = products[idx];
+    return [highlighted, ...products.slice(0, idx), ...products.slice(idx + 1)];
+  }, [products, highlightedId]);
+  
+  const visibleProducts = reordered.slice(0, visibleCount);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -55,20 +60,20 @@ export const InventoryPage: React.FC = () => {
             Manage your products and stock levels
           </p>
         </div>
-        <Button 
-          variant="primary" 
+        <Button
+          variant="primary"
           leftIcon={<Plus size={16} />}
-          onClick={() => {setIsModalOpen(true)}}
+          onClick={() => { setIsModalOpen(true); }}
         >
           Add Product
         </Button>
       </div>
 
-      <AddProductModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+      <AddProductModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
       />
-      
+
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div className="flex items-center space-x-2">
@@ -110,7 +115,14 @@ export const InventoryPage: React.FC = () => {
             </div>
           </div>
         </div>
-        {view === 'list' ? (<ProductTable products={visibleProducts} />) : (<InventoryGridView products={visibleProducts} />)}
+
+        {view === 'list' ? (
+          <ProductTable products={visibleProducts} highlightedId={highlightedId} />
+        ) : (
+          <InventoryGridView products={visibleProducts} highlightedId={highlightedId} />
+        )}
+
+
         <div ref={bottomRef}></div>
       </div>
     </div>
